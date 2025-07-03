@@ -1,0 +1,196 @@
+import networkx as nx
+import matplotlib.pyplot as plt
+from collections import deque
+
+# ======================================
+# 1. DEFINIÇÃO DAS CLASSES
+# ======================================
+
+class Estacao:
+    def __init__(self, nome):
+        self.nome = nome
+        self.vizinhos = {}
+
+    def adicionar_vizinho(self, vizinho, aresta):
+        self.vizinhos[vizinho] = aresta
+
+    def __str__(self):
+        return self.nome
+
+class Aresta:
+    def __init__(self, estacao1, estacao2, peso=1):
+        self.estacao1 = estacao1
+        self.estacao2 = estacao2
+        self.peso = peso
+
+    def __str__(self):
+        return f"{self.estacao1.nome} --{self.peso}--> {self.estacao2.nome}"
+
+class GrafoMetro:
+    def __init__(self):
+        self.estacoes = {}  # Dicionário {nome_estacao: objeto_Estacao}
+        self.arestas = []
+
+    def adicionar_estacao(self, nome):
+        if nome not in self.estacoes:
+            self.estacoes[nome] = Estacao(nome)
+
+    def adicionar_aresta(self, nome_estacao1, nome_estacao2, peso=1):
+        if nome_estacao1 in self.estacoes and nome_estacao2 in self.estacoes:
+            estacao1 = self.estacoes[nome_estacao1]
+            estacao2 = self.estacoes[nome_estacao2]
+            aresta = Aresta(estacao1, estacao2, peso)
+            self.arestas.append(aresta)
+            estacao1.adicionar_vizinho(estacao2, aresta)
+            estacao2.adicionar_vizinho(estacao1, aresta)  # Grafo não-direcionado
+
+    def bfs(self, inicio_nome):
+        inicio = self.estacoes.get(inicio_nome)
+        if not inicio:
+            return []
+        
+        visitados = set()
+        fila = deque([inicio])
+        visitados.add(inicio)
+        ordem_visita = []
+        
+        while fila:
+            estacao = fila.popleft()
+            ordem_visita.append(estacao.nome)
+            for vizinho in estacao.vizinhos:
+                if vizinho not in visitados:
+                    visitados.add(vizinho)
+                    fila.append(vizinho)
+        return ordem_visita
+
+    def dijkstra(self, origem_nome, destino_nome):
+        origem = self.estacoes.get(origem_nome)
+        destino = self.estacoes.get(destino_nome)
+        if not origem or not destino:
+            return []
+        
+        G_nx = self.para_networkx()
+        try:
+            caminho = nx.dijkstra_path(G_nx, origem_nome, destino_nome, weight='weight')
+            return caminho
+        except (nx.NetworkXNoPath, nx.NodeNotFound):
+            return []
+
+    def para_networkx(self):
+        G_nx = nx.Graph()
+        for aresta in self.arestas:
+            G_nx.add_edge(aresta.estacao1.nome, aresta.estacao2.nome, weight=aresta.peso)
+        return G_nx
+
+    def calcular_metricas(self):
+        G_nx = self.para_networkx()
+        metricas = {
+            "graus": dict(G_nx.degree()),
+            "centralidade_grau": nx.degree_centrality(G_nx),
+        }
+        
+        try:
+            metricas["diametro"] = nx.diameter(G_nx)
+        except nx.NetworkXError:
+            metricas["diametro"] = "Grafo não conexo"
+            
+        metricas["componentes"] = nx.number_connected_components(G_nx)
+        return metricas
+
+# ======================================
+# 2. CRIAÇÃO DO GRAFO
+# ======================================
+
+metro_recife = GrafoMetro()
+
+estacoes = [
+    "Madalena", "Joana Bezerra", "Largo da Paz", "Camaragibe", "Cabo",
+    "Afogados", "Casa Amarela", "Caxangá", "Tancredo Neves", "Cidade Universitária",
+    "Santa Luzia", "Boa Viagem", "Piedade", "Imbiribeira",
+    "Macaxeira", "Derby", "Prazeres", "Várzea"
+]
+
+conexoes = [
+    ("Madalena", "Joana Bezerra", 2), ("Madalena", "Afogados", 3), ("Joana Bezerra", "Largo da Paz", 2),
+    ("Largo da Paz", "Camaragibe", 4), ("Joana Bezerra", "Cabo", 5), ("Afogados", "Camaragibe", 3),
+    ("Casa Amarela", "Caxangá", 2), ("Tancredo Neves", "Cidade Universitária", 3),
+    ("Santa Luzia", "Boa Viagem", 4), ("Piedade", "Imbiribeira", 2),
+    ("Macaxeira", "Derby", 1), ("Imbiribeira", "Prazeres", 2), ("Várzea", "Cidade Universitária", 3),
+    ("Madalena", "Santa Luzia", 5), ("Joana Bezerra", "Tancredo Neves", 4),
+    ("Afogados", "Piedade", 3), ("Cabo", "Macaxeira", 4),
+    ("Caxangá", "Várzea", 3), ("Boa Viagem", "Afogados", 2), ("Imbiribeira", "Boa Viagem", 3), ("Derby", "Caxangá", 3),
+    ("Casa Amarela", "Macaxeira", 4), ("Derby", "Madalena", 2), ("Joana Bezerra", "Boa Viagem", 4)
+]
+
+for estacao in estacoes:
+    metro_recife.adicionar_estacao(estacao)
+
+for est1, est2, peso in conexoes:
+    metro_recife.adicionar_aresta(est1, est2, peso)
+
+# ======================================
+# 3. EXECUÇÃO DOS ALGORITMOS E MÉTRICAS
+# ======================================
+
+print("Ordem de visita BFS (Derby):", metro_recife.bfs("Derby"))
+print("\nCaminho mínimo (Dijkstra - Prazeres para Várzea):", metro_recife.dijkstra("Prazeres", "Várzea"))
+
+metricas = metro_recife.calcular_metricas()
+print("\nEstação mais conectada:", max(metricas["graus"].items(), key=lambda x: x[1]))
+print("\nDiâmetro da rede:", metricas["diametro"])
+
+# ======================================
+# 4. VISUALIZAÇÃO COMPLETA
+# ======================================
+
+G_nx = metro_recife.para_networkx()
+plt.figure(figsize=(18, 14))
+
+# Layout otimizado para grafos grandes
+pos = nx.kamada_kawai_layout(G_nx)
+
+# Desenho dos nós (cores por centralidade)
+nodes = nx.draw_networkx_nodes(
+    G_nx,
+    pos,
+    node_size=800,
+    node_color=list(metricas["centralidade_grau"].values()),
+    cmap=plt.cm.plasma,
+    alpha=0.9
+)
+
+# Desenho das arestas
+nx.draw_networkx_edges(
+    G_nx,
+    pos,
+    edge_color="gray",
+    width=1.5,
+    alpha=0.6
+)
+
+# Rótulos das estações
+nx.draw_networkx_labels(
+    G_nx,
+    pos,
+    font_size=10,
+    font_weight="bold",
+    font_family="sans-serif"
+)
+
+# Rótulos dos pesos das arestas
+edge_labels = nx.get_edge_attributes(G_nx, 'weight')
+nx.draw_networkx_edge_labels(
+    G_nx,
+    pos,
+    edge_labels=edge_labels,
+    font_size=8,
+    font_color='darkred',
+    bbox=dict(facecolor='white', edgecolor='none', alpha=0.7)
+)
+
+# Barra de cores e título
+plt.colorbar(nodes, label="Centralidade de Grau", shrink=0.8)
+plt.title("Rede do Metrô", size=18, pad=20)
+plt.axis('off')
+plt.tight_layout()
+plt.show()
