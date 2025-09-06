@@ -1,0 +1,1 @@
+Projeto para a disciplina de Estrutura de Dados com o objetivo de desenhar um grafo simples. O modelo escolhido foi uma relação arbitrária (em princípio, tempo ou distância) entre os bairros da região metropolitana de Recife.
